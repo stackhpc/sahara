@@ -456,6 +456,7 @@ class ClusterStack(object):
         inst_name = _get_inst_name(ng)
         private_net = self.cluster.neutron_management_network
 
+        sec_groups = None
         if ng.security_groups or ng.auto_security_group:
             sec_groups = self._get_security_groups(ng)
 
