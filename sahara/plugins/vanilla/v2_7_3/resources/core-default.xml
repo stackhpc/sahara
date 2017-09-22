@@ -1975,4 +1975,23 @@ for ldap providers in the same way as above does.
     <value>Client</value>
   </property>
 
+  <property>
+    <description>
+    </description>
+    <name>hadoop.ib.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <description>
+    </description>
+    <name>hadoop.roce.enabled</name>
+    <value>false</value>
+  </property>
+  <property>
+    <description>
+    </description>
+    <name>hadoop.rdma.dev.name</name>
+    <value>mlx5_0</value>
+  </property>
+
 </configuration>

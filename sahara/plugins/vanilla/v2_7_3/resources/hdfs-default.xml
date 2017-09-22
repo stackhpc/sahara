@@ -2473,4 +2473,12 @@
     reduces initial request failures after datanode restart.
   </description>
 </property>
+
+  <property>
+    <description>
+    </description>
+    <name>dfs.master</name>
+    <value>localhost</value>
+  </property>
+
 </configuration>
