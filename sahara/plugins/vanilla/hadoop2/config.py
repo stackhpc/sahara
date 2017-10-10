@@ -65,25 +65,30 @@ def configure_cluster(pctx, cluster):
     instances = utils.get_instances(cluster)
     configure_instances(pctx, instances)
     configure_topology_data(pctx, cluster)
-    configure_spark(cluster)
 
 
 def configure_spark(cluster):
-    extra = _extract_spark_configs_to_extra(cluster)
-    _push_spark_configs_to_node(cluster, extra)
-
-
-def _push_spark_configs_to_node(cluster, extra):
+    # TODO(johngarbut) work out who needs this now?
     spark_master = vu.get_spark_history_server(cluster)
     if spark_master:
-        _push_spark_configs_to_existing_node(spark_master, cluster, extra)
-        _push_cleanup_job(spark_master, extra)
-        with spark_master.remote() as r:
-            r.execute_command('sudo su - -c "mkdir /tmp/spark-events" hadoop')
+        extra = _extract_spark_configs_to_extra(spark_master)
+        _push_spark_configs_to_node(spark_master, extra)
 
 
-def _push_spark_configs_to_existing_node(spark_master, cluster, extra):
+def _configure_spark_instance(instance):
+    extra = _extract_spark_configs_to_extra(instance)
+    _push_spark_configs_to_node(instance, extra)
 
+
+def _push_spark_configs_to_node(instance, extra):
+    cluster = instance.node_group.cluster
+    _push_spark_configs_to_existing_node(instance, cluster, extra)
+    _push_cleanup_job(instance, extra)
+    with instance.remote() as r:
+        r.execute_command('sudo su - -c "mkdir /tmp/spark-events" hadoop')
+
+
+def _push_spark_configs_to_existing_node(instance, cluster, extra):
     sp_home = c_helper.get_spark_home(cluster)
     files = {
         os.path.join(sp_home,
@@ -93,7 +98,7 @@ def _push_spark_configs_to_existing_node(spark_master, cluster, extra):
             'conf/spark-defaults.conf'): extra['sp_defaults']
         }
 
-    with spark_master.remote() as r:
+    with instance.remote() as r:
         r.write_files_to(files, run_as_root=True)
 
 
@@ -111,14 +116,12 @@ def _push_cleanup_job(sp_master, extra):
             r.execute_command("sudo rm -f /etc/cron.d/spark-cleanup")
 
 
-def _extract_spark_configs_to_extra(cluster):
-    sp_master = utils.get_instance(cluster, "spark history server")
+def _extract_spark_configs_to_extra(instance):
+    cluster = instance.node_group.cluster
 
     extra = dict()
 
-    config_master = ''
-    if sp_master is not None:
-        config_master = c_helper.generate_spark_env_configs(cluster)
+    config_master = c_helper.generate_spark_env_configs(cluster)
 
     # Any node that might be used to run spark-submit will need
     # these libs for swift integration
@@ -153,6 +156,7 @@ def _provisioning_configs(pctx, instance):
     xmls, env = _generate_configs(pctx, instance)
     _push_xml_configs(instance, xmls)
     _push_env_configs(instance, env)
+    _configure_spark_instance(instance)
 
 
 def _generate_configs(pctx, instance):

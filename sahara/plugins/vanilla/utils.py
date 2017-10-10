@@ -40,6 +40,10 @@ def get_spark_history_server(cluster):
     return u.get_instance(cluster, "spark history server")
 
 
+def get_spark_master(cluster):
+    return u.get_instance(cluster, "master")
+
+
 def get_hiveserver(cluster):
     return u.get_instance(cluster, "hiveserver")
 

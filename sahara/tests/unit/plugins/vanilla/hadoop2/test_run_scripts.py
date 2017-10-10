@@ -55,7 +55,7 @@ class RunScriptsTest(base.SaharaTestCase):
         ins.node_group.node_processes = ['datanode', 'test']
         rs.start_dn_nm_processes(instances)
         instances_with_services.assert_called_once_with(
-            instances, ['datanode', 'nodemanager'])
+            instances, ['datanode', 'nodemanager', 'slave'])
         add_provisioning_step.assert_called_once_with('111', mess, 1)
         set_current_instance_id.assert_called_once_with('123')
         _start_processes.assert_called_once_with(ins, ['datanode'])

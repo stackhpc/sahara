@@ -95,6 +95,9 @@ def _get_spark_configs():
                            applicable_target=service,
                            scope="cluster", is_optional=True,
                            priority=item["priority"])
+            if cfg.default_value in ["true", "false"]:
+                cfg.config_type = "bool"
+                cfg.default_value = (cfg.default_value == 'true')
             spark_configs.append(cfg)
     return spark_configs
 

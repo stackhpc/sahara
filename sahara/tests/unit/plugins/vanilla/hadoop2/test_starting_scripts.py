@@ -138,15 +138,24 @@ class StartingScriptsTest(base.SaharaTestCase):
         self.assertEqual(get_hiveserver.call_count, 2)
 
     @mock.patch(plugins_path +
+                'hadoop2.run_scripts.start_spark_master')
+    @mock.patch(plugins_path + 'utils.get_spark_master')
+    @mock.patch(plugins_path +
                 'hadoop2.run_scripts.start_spark_history_server')
     @mock.patch(plugins_path + 'utils.get_spark_history_server')
     def test_start_spark(self, get_spark_history_server,
-                         start_spark_history_server):
+                         start_spark_history_server,
+                         get_spark_master, start_spark_master):
         get_spark_history_server.return_value = 0
+        get_spark_master.return_value = 0
         s_scripts.start_spark(self.cluster)
         get_spark_history_server.assert_called_once_with(self.cluster)
+        get_spark_master.assert_called_once_with(self.cluster)
 
         get_spark_history_server.return_value = 1
+        get_spark_master.return_value = 1
         s_scripts.start_spark(self.cluster)
         start_spark_history_server.assert_called_once_with(1)
+        start_spark_master.assert_called_once_with(1)
         self.assertEqual(get_spark_history_server.call_count, 2)
+        self.assertEqual(get_spark_master.call_count, 2)

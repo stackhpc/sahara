@@ -58,7 +58,7 @@ class VersionHandler(avm.AbstractVersionHandler):
             "YARN": ["resourcemanager", "nodemanager"],
             "JobFlow": ["oozie"],
             "Hive": ["hiveserver"],
-            "Spark": ["spark history server"]
+            "Spark": ["master", "slave", "spark history server"]
         }
 
     def validate(self, cluster):
@@ -106,6 +106,7 @@ class VersionHandler(avm.AbstractVersionHandler):
         hs = vu.get_historyserver(cluster)
         oo = vu.get_oozie(cluster)
         sp = vu.get_spark_history_server(cluster)
+        sm = vu.get_spark_master(cluster)
         info = {}
 
         if rm:
@@ -136,6 +137,12 @@ class VersionHandler(avm.AbstractVersionHandler):
                 'Spark UI': 'http://%s:%s' % (sp.management_ip, '4040'),
                 'Spark History Server UI':
                     'http://%s:%s' % (sp.management_ip, '18080')
+            }
+
+        if sm:
+            info['Apache Spark'] = {
+                'Spark UI': 'http://%s:%s' % (sm.management_ip, '8080'),
+                'Spark URL': 'spark://%s:%s' % (sm.management_ip, '7077'),
             }
 
         ctx = context.ctx()

@@ -136,26 +136,58 @@ class TestConfigHelper(base.SaharaTestCase):
         default = c_helper._get_spark_opt_default(opt_name)
         self.assertEqual(default, 'test')
 
-    def test_generate_spark_env_configs(self):
+    @mock.patch.object(c_helper, 'get_spark_home')
+    @mock.patch.object(c_helper, 'get_spark_master_hostname')
+    @mock.patch('sahara.plugins.utils.get_config_value_or_default')
+    def test_generate_spark_env_configs(self, get_config_value_or_default,
+                                        get_smh, get_home):
+        get_config_value_or_default.return_value = False
+        ret = c_helper.generate_spark_env_configs(self.cluster)
         configs = 'HADOOP_CONF_DIR=/opt/hadoop/etc/hadoop\n' \
                   'YARN_CONF_DIR=/opt/hadoop/etc/hadoop'
-        ret = c_helper.generate_spark_env_configs(self.cluster)
-        self.assertEqual(ret, configs)
+        self.assertEqual(configs, ret)
 
+        get_config_value_or_default.return_value = True
+        get_smh.return_value = "sparkmasterhostname"
+        get_home.return_value = "/opt/spark"
+        ret = c_helper.generate_spark_env_configs(self.cluster)
+        expected = """\
+export SPARK_CONF_DIR=/opt/spark/conf
+export SPARK_MASTER_HOST=sparkmasterhostname
+export SPARK_LOCAL_IP=`hostname -s`"""
+        self.assertEqual(expected, ret)
+
+    @mock.patch.object(c_helper, 'get_spark_home')
+    @mock.patch.object(c_helper, 'get_spark_master_hostname')
     @mock.patch('sahara.plugins.utils.get_config_value_or_default')
     def test_generate_spark_executor_classpath(self,
-                                               get_config_value_or_default):
-        get_config_value_or_default.return_value = None
+                                               get_config_value_or_default,
+                                               get_smh, get_home):
+        get_smh.return_value = "sparkmasterhostname"
+        get_home.return_value = "/opt/spark"
         path = 'Executor extra classpath'
-        ret = c_helper.generate_spark_executor_classpath(self.cluster)
-        get_config_value_or_default.assert_called_once_with('Spark',
-                                                            path,
-                                                            self.cluster)
-        self.assertEqual(ret, '\n')
 
-        get_config_value_or_default.return_value = 'test'
+        get_config_value_or_default.side_effect = [None, None]
         ret = c_helper.generate_spark_executor_classpath(self.cluster)
-        self.assertEqual(ret, 'spark.executor.extraClassPath test')
+        self.assertEqual('', ret)
+
+        get_config_value_or_default.assert_has_calls([
+            mock.call('Spark', path, self.cluster),
+            mock.call('Spark', 'spark.ib.enabled', self.cluster)])
+
+        get_config_value_or_default.side_effect = ['test', True, '1']
+        ret = c_helper.generate_spark_executor_classpath(self.cluster)
+        expected = """\
+spark.executor.extraClassPath test
+spark.ib.enabled true
+hadoop.ib.enabled false
+spark.shuffle.rdma.device.num 1
+spark.master spark://sparkmasterhostname:7077
+spark.executor.extraLibraryPath /opt/spark/lib/native/Linux-amd64-64:\
+/opt/hadoop/lib/native
+spark.driver.extraLibraryPath /opt/spark/lib/native/Linux-amd64-64:\
+/opt/hadoop/lib/native"""
+        self.assertEqual(expected, ret)
 
     @mock.patch('sahara.utils.files.get_file_text')
     @mock.patch('sahara.plugins.utils.get_config_value_or_default')

@@ -71,6 +71,17 @@ def validate_cluster_creating(pctx, cluster):
                                                 _('0 or 1'),
                                                 spark_hist_count)
 
+    spark_master_count = _get_inst_count(cluster, 'master')
+    if spark_master_count > 1:
+        raise ex.InvalidComponentCountException('master',
+                                                _('0 or 1'),
+                                                spark_master_count)
+
+    spark_slave_count = _get_inst_count(cluster, 'slave')
+    if spark_slave_count > 0 and spark_master_count == 0:
+        raise ex.RequiredServiceMissingException('master',
+                                                 required_by='slave')
+
     rep_factor = cu.get_config_value(pctx, 'HDFS', 'dfs.replication', cluster)
     if dn_count < rep_factor:
         raise ex.InvalidComponentCountException(
@@ -126,7 +137,7 @@ def validate_existing_ng_scaling(pctx, cluster, existing):
 
 
 def _get_scalable_processes():
-    return ['datanode', 'nodemanager']
+    return ['datanode', 'nodemanager', 'slave']
 
 
 def _get_inst_count(cluster, process):

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 from oslo_config import cfg
 import six
 
@@ -126,6 +128,18 @@ SPARK_CONFS = {
                 'description': 'No job data will be purged unless the total'
                 ' job data exceeds this size (default: 4096 = 4GB)',
                 'default': '4096',
+                'priority': 2,
+            },
+            {
+                'name': 'spark.ib.enabled',
+                'description': 'Enable or disable InfiniBand support.',
+                'default': 'false',
+                'priority': 2,
+            },
+            {
+                'name': 'spark.shuffle.rdma.device.num',
+                'description': 'Which InfiniBand device to use for Spark.',
+                'default': None,
                 'priority': 2,
             },
         ]
@@ -271,15 +285,51 @@ def generate_spark_env_configs(cluster):
     # Hadoop and YARN configs there are in one folder
     configs.append('YARN_CONF_DIR=' + HADOOP_CONF_DIR)
 
+    ib = utils.get_config_value_or_default(
+        "Spark", "spark.ib.enabled", cluster)
+    if ib:
+        # TODO(johngarbutt) bug means we can't have HADOOP and YARN config
+        configs = []
+        sp_home = get_spark_home(cluster)
+        conf_path = os.path.join(sp_home, "conf")
+        configs.append("export SPARK_CONF_DIR=%s" % conf_path)
+        spark_master_hostname = get_spark_master_hostname(cluster)
+        configs.append("export SPARK_MASTER_HOST=%s" % spark_master_hostname)
+        configs.append("export SPARK_LOCAL_IP=`hostname -s`")
+
     return '\n'.join(configs)
 
 
 def generate_spark_executor_classpath(cluster):
+    configs = []
+
     cp = utils.get_config_value_or_default(
         "Spark", "Executor extra classpath", cluster)
     if cp:
-        return "spark.executor.extraClassPath " + cp
-    return "\n"
+        configs.append("spark.executor.extraClassPath " + cp)
+
+    ib = utils.get_config_value_or_default(
+        "Spark", "spark.ib.enabled", cluster)
+    if ib:
+        configs.append("spark.ib.enabled true")
+        configs.append("hadoop.ib.enabled false")
+
+        ib_device = utils.get_config_value_or_default(
+            "Spark", "spark.shuffle.rdma.device.num", cluster)
+        if ib_device:
+            configs.append("spark.shuffle.rdma.device.num %s" % ib_device)
+
+        spark_master_hostname = get_spark_master_hostname(cluster)
+        configs.append("spark.master spark://%s:7077" % spark_master_hostname)
+
+        sp_home = get_spark_home(cluster)
+        path1 = os.path.join(sp_home, "lib/native/Linux-amd64-64")
+        path2 = "/opt/hadoop/lib/native"
+        extra_lib_path = ":".join([path1, path2])
+        configs.append("spark.executor.extraLibraryPath %s" % extra_lib_path)
+        configs.append("spark.driver.extraLibraryPath %s" % extra_lib_path)
+
+    return '\n'.join(configs)
 
 
 def generate_job_cleanup_config(cluster):
@@ -305,3 +355,9 @@ def generate_job_cleanup_config(cluster):
 
 def get_spark_home(cluster):
     return utils.get_config_value_or_default("Spark", "Spark home", cluster)
+
+
+def get_spark_master_hostname(cluster):
+    spark_master = utils.get_instance(cluster, "master")
+    if spark_master:
+        return spark_master.hostname()

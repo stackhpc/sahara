@@ -33,7 +33,7 @@ LOG = logging.getLogger(__name__)
 
 
 def start_dn_nm_processes(instances):
-    filternames = ['datanode', 'nodemanager']
+    filternames = ['datanode', 'nodemanager', 'slave']
     instances = pu.instances_with_services(instances, filternames)
 
     if len(instances) == 0:
@@ -62,6 +62,15 @@ def _start_processes(instance, processes):
         if 'nodemanager' in processes:
             r.execute_command(
                 'sudo su - -c  "yarn-daemon.sh start nodemanager" hadoop')
+        if 'slave' in processes:
+            sp_home = c_helper.get_spark_home(instance.cluster)
+            sp_master = c_helper.get_spark_master_hostname(instance.cluster)
+            spark_master_uri = "spark://%s:7077" % sp_master
+            start_script = os.path.join(sp_home, 'sbin/start-slave.sh')
+            conf = os.path.join(sp_home, 'conf/spark-defaults.conf')
+            command = '%s --properties-file %s %s' % (start_script, conf,
+                                                      spark_master_uri)
+            r.execute_command('sudo su - -c  "%s" hadoop' % command)
 
 
 def start_hadoop_process(instance, process):
@@ -113,6 +122,16 @@ def start_spark_history_server(master):
         with master.remote() as r:
             r.execute_command('sudo su - -c "bash %s" hadoop' % os.path.join(
                 sp_home, 'sbin/start-history-server.sh'))
+
+
+def start_spark_master(master):
+    sp_home = c_helper.get_spark_home(master.cluster)
+    with context.set_current_instance_id(master.instance_id):
+        with master.remote() as r:
+            start_script = os.path.join(sp_home, 'sbin/start-master.sh')
+            conf = os.path.join(sp_home, 'conf/spark-defaults.conf')
+            command = '%s --properties-file %s' % (start_script, conf)
+            r.execute_command('sudo su - -c "bash %s" hadoop' % command)
 
 
 def format_namenode(instance):
